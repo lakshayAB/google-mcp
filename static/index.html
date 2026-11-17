@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google Ads Chat</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #1f2328;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #1a73e8;
+      --user-bg: #1a73e8;
+      --user-text: #ffffff;
+      --bot-bg: #ffffff;
+      --error: #b42318;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 14px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+    header button {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 10px; cursor: pointer; color: var(--muted); font-size: 13px;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .msg {
+      padding: 10px 14px;
+      border-radius: 10px;
+      max-width: 85%;
+      line-height: 1.5;
+      font-size: 15px;
+      overflow-x: auto;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: var(--user-bg);
+      color: var(--user-text);
+      white-space: pre-wrap;
+    }
+    .msg.bot { align-self: flex-start; background: var(--bot-bg); border: 1px solid var(--border); }
+    .msg.error { align-self: flex-start; background: #fef3f2; border: 1px solid #fecdca; color: var(--error); }
+    .msg.thinking { align-self: flex-start; color: var(--muted); font-style: italic; background: none; }
+    .msg p { margin: 0 0 8px; }
+    .msg p:last-child { margin-bottom: 0; }
+    .msg table { border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+    .msg th, .msg td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+    .msg th { background: #f3f4f6; }
+    .msg code { background: #f3f4f6; padding: 1px 4px; border-radius: 4px; font-size: 13px; }
+    .msg pre { background: #f3f4f6; padding: 8px; border-radius: 6px; overflow-x: auto; }
+    .msg pre code { background: none; padding: 0; }
+    .empty { color: var(--muted); text-align: center; margin-top: 40px; font-size: 14px; }
+    .empty li { list-style: none; margin: 6px 0; cursor: pointer; color: var(--accent); }
+    form {
+      display: flex;
+      gap: 8px;
+      padding: 14px 20px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+    }
+    form > div { display: flex; gap: 8px; max-width: 900px; width: 100%; margin: 0 auto; }
+    textarea {
+      flex: 1;
+      resize: none;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 15px;
+      min-height: 44px;
+      max-height: 160px;
+    }
+    textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    #send {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0 18px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    #send:disabled { opacity: 0.5; cursor: default; }
+    #attach {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      padding: 0 12px; cursor: pointer; color: var(--muted); font-size: 14px;
+    }
+    #attach:disabled { opacity: 0.5; cursor: default; }
+    #attachments { max-width: 900px; width: 100%; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px; }
+    #attachments:empty { display: none; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
+      background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 999px; padding: 3px 10px;
+    }
+    .chip button { background: none; border: none; cursor: pointer; color: var(--muted); padding: 0; font-size: 14px; }
+    .confirm {
+      align-self: flex-start; max-width: 85%; background: #fffbeb; border: 1px solid #fcd34d;
+      border-radius: 10px; padding: 12px 14px; font-size: 14px; overflow-x: auto;
+    }
+    .confirm h3 { margin: 0 0 8px; font-size: 15px; }
+    .confirm table { border-collapse: collapse; margin: 6px 0 10px; font-size: 13px; }
+    .confirm th, .confirm td { border: 1px solid #fde68a; padding: 3px 8px; text-align: left; vertical-align: top; }
+    .confirm th { background: #fef3c7; }
+    .confirm .tool { font-weight: 600; margin-top: 6px; text-transform: capitalize; }
+    .confirm .actions { display: flex; gap: 8px; margin-top: 4px; }
+    .confirm .actions button { border-radius: 6px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
+    .confirm .ok { background: #15803d; color: #fff; border: none; }
+    .confirm .cancel { background: #fff; border: 1px solid var(--border); }
+    .confirm .actions button:disabled { opacity: 0.5; cursor: default; }
+    .confirm .status { color: var(--muted); font-style: italic; margin-top: 6px; }
+    form { flex-direction: column; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Google Ads Chat</h1>
+    <button id="reset" type="button">New chat</button>
+  </header>
+
+  <div id="messages">
+    <div class="empty" id="empty">
+      <p>Ask a question about your Google Ads data. For example:</p>
+      <ul>
+        <li>Which accounts can I access?</li>
+        <li>Spend, clicks, conversions by campaign last 7 days</li>
+        <li>Top 10 keywords by cost with zero conversions last 30 days</li>
+        <li>This month vs last month by campaign</li>
+        <li>Create a label "Q4 Review" and add it to my top 3 campaigns by cost</li>
+      </ul>
+    </div>
+  </div>
+
+  <form id="form">
+    <div id="attachments"></div>
+    <div>
+      <button id="attach" type="button" title="Attach an image or video for an asset or YouTube upload">Attach</button>
+      <input id="file" type="file" accept="image/png,image/jpeg,image/gif,video/*" hidden>
+      <textarea id="input" rows="1" placeholder="Ask about your data, or ask for a label, asset or video upload..." autofocus></textarea>
+      <button id="send" type="submit">Send</button>
+    </div>
+  </form>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+    const attachBtn = document.getElementById("attach");
+    const fileInput = document.getElementById("file");
+    const attachmentsEl = document.getElementById("attachments");
+
+    // Show raw HTML in answers as text (ad copy or names could contain markup).
+    const escapeHtml = (s) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    marked.use({ renderer: { html: (token) => escapeHtml(typeof token === "string" ? token : token.text) } });
+
+    // Full Gemini conversation (including tool calls/results), returned by the server.
+    let history = [];
+    // Files uploaded for the next message: {path, name, kind}.
+    let attachments = [];
+    // Confirm card waiting for a click, if any.
+    let openCard = null;
+
+    function addMessage(kind, content) {
+      document.getElementById("empty")?.remove();
+      const el = document.createElement("div");
+      el.className = `msg ${kind}`;
+      if (kind === "bot") {
+        el.innerHTML = marked.parse(content);
+      } else {
+        el.textContent = content;
+      }
+      messagesEl.appendChild(el);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return el;
+    }
+
+    function setBusy(busy) {
+      sendBtn.disabled = busy;
+      input.disabled = busy;
+      attachBtn.disabled = busy;
+      if (!busy) input.focus();
+    }
+
+    async function postChat(body, thinkingText) {
+      const thinking = addMessage("thinking", thinkingText);
+      setBusy(true);
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, history }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.detail || `Request failed (${res.status})`);
+        }
+        history = data.history;
+        thinking.remove();
+        addMessage("bot", data.answer);
+        if (data.pending_action) showConfirmCard(data.pending_action);
+      } catch (err) {
+        thinking.remove();
+        addMessage("error", `Error: ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function send(text) {
+      // A new message skips any change still waiting for confirmation.
+      closeCard("Skipped: nothing was changed.");
+      let message = text;
+      let shown = text;
+      if (attachments.length) {
+        message += "\n\n" + attachments
+          .map((a) => `[Attached file: ${a.path} (${a.kind}, original name: ${a.name})]`)
+          .join("\n");
+        shown += "\n" + attachments.map((a) => `Attached: ${a.name}`).join("\n");
+        attachments = [];
+        renderAttachments();
+      }
+      addMessage("user", shown);
+      return postChat({ message }, "Thinking...");
+    }
+
+    const prettyTool = (name) => name.replace(/_/g, " ");
+
+    function cell(row, text, header = false) {
+      const el = document.createElement(header ? "th" : "td");
+      el.textContent = text ?? "";
+      row.appendChild(el);
+    }
+
+    function showConfirmCard(action) {
+      document.getElementById("empty")?.remove();
+      const card = document.createElement("div");
+      card.className = "confirm";
+      const title = document.createElement("h3");
+      title.textContent = "Confirm change in Google Ads";
+      card.appendChild(title);
+
+      for (const change of action.changes) {
+        const tool = document.createElement("div");
+        tool.className = "tool";
+        tool.textContent = prettyTool(change.tool);
+        card.appendChild(tool);
+
+        const table = document.createElement("table");
+        const head = table.insertRow();
+        if (change.change_items && change.change_items.length) {
+          const hasOld = change.change_items.some((c) => c.original_value_readable);
+          ["Operation", "Item", "Field", "New value", ...(hasOld ? ["Old value"] : [])].forEach((h) => cell(head, h, true));
+          for (const c of change.change_items) {
+            const row = table.insertRow();
+            [c.operation, c.entity_readable, c.field_readable, c.value_readable, ...(hasOld ? [c.original_value_readable] : [])]
+              .forEach((v) => cell(row, v));
+          }
+        } else {
+          ["Setting", "Value"].forEach((h) => cell(head, h, true));
+          for (const [k, v] of Object.entries(change.arguments)) {
+            const row = table.insertRow();
+            cell(row, k);
+            cell(row, typeof v === "string" ? v : JSON.stringify(v));
+          }
+        }
+        card.appendChild(table);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const ok = document.createElement("button");
+      ok.className = "ok";
+      ok.textContent = "Confirm";
+      const cancel = document.createElement("button");
+      cancel.className = "cancel";
+      cancel.textContent = "Cancel";
+      actions.append(ok, cancel);
+      card.appendChild(actions);
+
+      const answer = (approve) => {
+        closeCard(approve ? "Confirmed." : "Cancelled.");
+        postChat({ confirm: { action_id: action.id, approve } }, approve ? "Making the change..." : "Cancelling...");
+      };
+      ok.addEventListener("click", () => answer(true));
+      cancel.addEventListener("click", () => answer(false));
+
+      messagesEl.appendChild(card);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      openCard = card;
+    }
+
+    function closeCard(statusText) {
+      if (!openCard) return;
+      openCard.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      const status = document.createElement("div");
+      status.className = "status";
+      status.textContent = statusText;
+      openCard.appendChild(status);
+      openCard = null;
+    }
+
+    function renderAttachments() {
+      attachmentsEl.innerHTML = "";
+      attachments.forEach((a, i) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = `${a.kind}: ${a.name}`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "x";
+        remove.title = "Remove";
+        remove.addEventListener("click", () => {
+          attachments.splice(i, 1);
+          renderAttachments();
+        });
+        chip.appendChild(remove);
+        attachmentsEl.appendChild(chip);
+      });
+    }
+
+    attachBtn.addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      attachBtn.disabled = true;
+      attachBtn.textContent = "Uploading...";
+      try {
+        const res = await fetch(`/upload?filename=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `Upload failed (${res.status})`);
+        attachments.push(data);
+        renderAttachments();
+      } catch (err) {
+        addMessage("error", `Error: ${err.message}`);
+      } finally {
+        attachBtn.textContent = "Attach";
+        attachBtn.disabled = sendBtn.disabled;
+      }
+    });
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || sendBtn.disabled) return;
+      input.value = "";
+      input.style.height = "";
+      send(text);
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = `${input.scrollHeight}px`;
+    });
+
+    document.querySelectorAll(".empty li").forEach((li) =>
+      li.addEventListener("click", () => send(li.textContent))
+    );
+
+    document.getElementById("reset").addEventListener("click", () => {
+      history = [];
+      openCard = null;
+      attachments = [];
+      renderAttachments();
+      messagesEl.innerHTML = "";
+      input.focus();
+    });
+  </script>
+</body>
+</html>

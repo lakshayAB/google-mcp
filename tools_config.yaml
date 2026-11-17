@@ -1,0 +1,14 @@
+# Tool groups the Google Ads MCP server exposes to the chatbot.
+#
+# customers, search, metadata: read-only.
+# labels: create/update/remove labels and attach/detach them (campaigns, ad groups, keywords, account).
+# assets: create standalone assets and upload videos to YouTube.
+#
+# For a strictly read-only chatbot, set labels and assets to false.
+# Any group left out of this list is disabled.
+namespaces:
+  customers: true
+  search: true
+  metadata: true
+  labels: true
+  assets: true

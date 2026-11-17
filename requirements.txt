@@ -1,0 +1,6 @@
+google-genai>=2.34.0,<3
+mcp>=2.3.0,<3
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-dotenv>=1.0
+google-auth-oauthlib>=1.2
